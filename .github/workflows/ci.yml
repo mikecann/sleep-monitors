@@ -1,0 +1,28 @@
+name: CI
+
+on: [push, pull_request]
+
+jobs:
+  test:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Parse every PowerShell script
+        shell: pwsh
+        run: |
+          $failed = $false
+          Get-ChildItem -Recurse -Filter *.ps1 | ForEach-Object {
+              $parseErrors = $null
+              $tokens = $null
+              [System.Management.Automation.Language.Parser]::ParseFile($_.FullName, [ref]$tokens, [ref]$parseErrors) | Out-Null
+              if ($parseErrors.Count -gt 0) {
+                  $parseErrors | ForEach-Object { Write-Host $_ }
+                  $failed = $true
+              }
+          }
+          if ($failed) { throw "PowerShell parse check failed" }
+      - name: Test dry run and installer contracts on Windows PowerShell
+        shell: powershell
+        run: |
+          & ./tests/test_sleep_monitors.ps1
+          & ./tests/test_install.ps1
